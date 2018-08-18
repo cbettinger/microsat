@@ -1,10 +1,17 @@
-Compile using:
+# glencoe-microsat
 
-  ./configure && make
+## Build
 
-Use as follows:
+	./configure && make
 
-  ./microsat FILE
+## Build and Install
 
-in which FILE is a SAT problem in the DIMACS format
+	./configure && sudo make install
 
+## Usage
+### Version info
+
+	./microsat --version
+
+### Solving a DIMACS encoded SAT problem
+	./microsat DIMACS_FILE

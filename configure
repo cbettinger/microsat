@@ -2,27 +2,27 @@
 debug=no
 while [ $# -gt 0 ]
 do
-  case $1 in
-    -h) echo "usage: configure [-g | -h]"; exit 0;;
-    -g) debug=yes;;
-  esac
-  shift
+	case $1 in
+		-h) echo "usage: configure [-g | -h]"; exit 0;;
+		-g) debug=yes;;
+	esac
+	shift
 done
 [ "$CC" ] || CC=gcc
 if [ ! "$CFLAGS" ]
 then
-  case $CC in
-    gcc*|clang*)
-      CFLAGS="-Wall"
-      [ $debug = yes ] && CFLAGS="$CFLAGS -g3"
-      [ $debug = no ] && CFLAGS="$CFLAGS -O3"
-      ;;
-    *)
-      CFLAGS="-W"
-      [ $debug = yes ] && CFLAGS="$CFLAGS -g"
-      [ $debug = no ] && CFLAGS="$CFLAGS -O"
-      ;;
-  esac
+	case $CC in
+		gcc*|clang*)
+			CFLAGS="-Wall"
+			[ $debug = yes ] && CFLAGS="$CFLAGS -g3"
+			[ $debug = no ] && CFLAGS="$CFLAGS -O3"
+			;;
+		*)
+			CFLAGS="-W"
+			[ $debug = yes ] && CFLAGS="$CFLAGS -g"
+			[ $debug = no ] && CFLAGS="$CFLAGS -O"
+			;;
+	esac
 fi
 CFLAGS="$CFLAGS -DVERSION=\\\"`cat VERSION`\\\""
 echo "$CC $CFLAGS"
@@ -32,4 +32,7 @@ microsat: microsat.c makefile
 	$CC $CFLAGS -o microsat microsat.c
 clean:
 	rm -f microsat makefile
+install: microsat
+	chmod +x microsat
+	cp microsat /usr/local/bin
 EOF
