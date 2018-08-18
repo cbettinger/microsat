@@ -141,7 +141,6 @@ int solve (struct solver* S) {                                      // Determine
     if (S->nLemmas > old_nLemmas) {                                 // If the last decision caused a conflict
       decision = S->head;                                           // Reset the decision heuristic to head
       if (S->fast > (S->slow / 100) * 125) {                        // If fast average is substantially larger than slow average
-//        printf("c restarting after %i conflicts (%i %i) %i\n", S->res, S->fast, S->slow, S->nLemmas > S->maxLemmas);
         S->res = 0; S->fast = (S->slow / 100) * 125; restart (S);   // Restart and update the averages
         if (S->nLemmas > S->maxLemmas) reduceDB (S, 6); } }         // Reduce the DB when it contains too many lemmas
 
