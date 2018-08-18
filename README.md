@@ -1,5 +1,7 @@
 # glencoe-microsat
 
+This work is derived from [microsat](https://github.com/marijnheule/microsat) by Marijn Heule and Armin Biere.
+
 ## Build
 
 	./configure && make
