@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 enum { END = -9, UNSAT = 0, SAT = 1, MARK = 2, IMPLIED = 6 };
 
@@ -205,6 +206,8 @@ int parse (struct solver* S, char* filename) {                            // Par
   return SAT; }                                            // Return that no conflict was observed
 
 int main (int argc, char** argv) {			               // The main procedure for a STANDALONE solver
+  if (argc < 2) abort ();
+  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (0);
   struct solver S;	                                               // Create the solver datastructure
   if      (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n");  // Parse the DIMACS file in argv[1]
   else if (solve (&S)          == UNSAT) printf("s UNSATISFIABLE\n");  // Solve without limit (number of conflicts)
