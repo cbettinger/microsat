@@ -1,6 +1,6 @@
 # microsat
 
-*Note*: This work is a fork of [microsat](https://github.com/marijnheule/microsat) by Marijn Heule and Armin Biere.
+*Note*: This is a fork of [microsat](https://github.com/marijnheule/microsat) by Marijn Heule and Armin Biere.
 
 ## Build
 
