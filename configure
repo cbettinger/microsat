@@ -25,7 +25,7 @@ then
 	esac
 fi
 CFLAGS="$CFLAGS -DVERSION=\\\"`cat VERSION`\\\""
-echo "$CC $CFLAGS"
+echo Version: `cat VERSION`
 rm -f makefile
 cat > makefile <<EOF
 microsat: microsat.c makefile
