@@ -1,6 +1,6 @@
-# glencoe-microsat
+# microsat
 
-This work is derived from [microsat](https://github.com/marijnheule/microsat) by Marijn Heule and Armin Biere.
+*Note*: This work is a fork of [microsat](https://github.com/marijnheule/microsat) by Marijn Heule and Armin Biere.
 
 ## Build
 
@@ -13,7 +13,7 @@ This work is derived from [microsat](https://github.com/marijnheule/microsat) by
 ## Usage
 ### Version info
 
-	./microsat --version
+	microsat --version
 
 ### Solving a DIMACS encoded SAT problem
-	./microsat DIMACS_FILE
+	microsat DIMACS_FILE
