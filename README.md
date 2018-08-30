@@ -21,7 +21,7 @@
 ## Original License(s)
 ### The MIT License
 
-Original work: Copyright © 2014-2018 Marijn Heule
+Original work: Copyright © 2014-2018 Marijn Heule  
 Contributions: Copyright © 2018 Armin Biere
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
