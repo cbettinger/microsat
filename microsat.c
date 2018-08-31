@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum EXIT_CODES { OK = 0, OUT_OF_MEMORY = 1, SAT = 10, UNSAT = 20 };
+enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
 
 const int MEM_MAX = 1 << 30;
@@ -29,7 +29,7 @@ void addWatch (struct solver* S, int lit, int mem) {               // Add a watc
 
 int* getMemory (struct solver* S, int mem_size) {                  // Allocate memory of size mem_size
   if (S->mem_used + mem_size > MEM_MAX) {                          // In case the code is used within a code base
-    printf ("c OUT OF MEMORY\n"); exit (OUT_OF_MEMORY); }
+    printf ("c OUT OF MEMORY\n"); exit (ERROR); }
   int *store = (S->DB + S->mem_used);                              // Compute a pointer to the new memory location
   S->mem_used += mem_size;                                         // Update the size of the used memory
   return store; }                                                  // Return the pointer
@@ -187,6 +187,7 @@ void initCDCL (struct solver* S, int n, int m) {
 
 int parse (struct solver* S, char* filename) {                            // Parse the formula and initialize
   int tmp; FILE* input = fopen (filename, "r");                           // Read the CNF file
+  if (input == NULL) printf ("c FILE NOT FOUND\n"), exit (ERROR);         // Exit if file not found
   do { tmp = fscanf (input, " p cnf %i %i \n", &S->nVars, &S->nClauses);  // Find the first non-comment line
     if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }    // In case a comment line was found
   while (tmp != 2 && tmp != EOF);                                         // Skip it and read next line
@@ -207,8 +208,8 @@ int parse (struct solver* S, char* filename) {                            // Par
   return SAT; }                                            // Return that no conflict was observed
 
 int main (int argc, char** argv) {                                                   // The main procedure for a STANDALONE solver
-  if (argc == 1) printf ("Usage: microsat DIMACS_FILE\n"), exit (OK);
-  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);
+  if (argc == 1) printf ("Usage: microsat DIMACS_FILE\n"), exit (OK);                // Print usage if no argument is given
+  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);              // Print version if argument --version is given
   struct solver S;	                                                                 // Create the solver datastructure
   if      (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);  // Parse the DIMACS file in argv[1]
   else if (solve (&S)          == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);  // Solve without limit (number of conflicts)
