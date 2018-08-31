@@ -1,0 +1,6 @@
+* text=auto
+
+configure text eol=lf
+makefile text eol=lf
+VERSION text eol=lf
+*.c text eol=lf
