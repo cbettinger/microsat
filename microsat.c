@@ -207,7 +207,7 @@ int parse (struct solver* S, char* filename) {                            // Par
   return SAT; }                                            // Return that no conflict was observed
 
 int main (int argc, char** argv) {                                                   // The main procedure for a STANDALONE solver
-  if (argc < 2) abort ();
+  if (argc == 1) printf ("Usage: microsat DIMACS_FILE\n"), exit (OK);
   if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);
   struct solver S;	                                                                 // Create the solver datastructure
   if      (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);  // Parse the DIMACS file in argv[1]
