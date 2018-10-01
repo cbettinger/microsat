@@ -173,7 +173,7 @@ void checkBuildability (struct solver* S) {
 				  for (int i = 1; i <= S->nVars; i++) {
 				    if (!S->model[i] && !S->false[i]) {
 				      int lemma = -i;
-				      assign (S, &lemma, 1);
+				      assign (S, &lemma, 0);
 				      if (!evaluateClauses (S)) {
             buildable = 0;
 				        break; } } } }
@@ -191,11 +191,12 @@ void evaluateSystemDecisions (struct solver* S) {
       propagate (S); } } }
 
 void printSystemDecisions (struct solver* S) {
+  printf ("%s", "v");
   for (int i = 1; i <= S->nVars; i++) {
     if (S->model[i] && (S->false[-i] == IMPLIED)) {
-      printf ("%i ", i); }
+      printf (" %i", i); }
       else if (S->false[i] == IMPLIED) {
-      printf ("%i ", -i); } }
+      printf (" %i", -i); } }
   printf ("\n"); }
 
 int checkConfiguration (struct solver* S) {
@@ -219,8 +220,8 @@ int solve (struct solver* S) {                                      // Determine
 
   if (MODE == CONFIG_SYS) {
     evaluateSystemDecisions (S);
+    checkBuildability(S);
     printSystemDecisions (S);
-    checkBuildability (S);
     exit (CONFIG); }
   else if (MODE == CONFIG_CHECK) {
     if (checkConfiguration (S) == 1) {
