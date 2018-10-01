@@ -18,6 +18,12 @@
 ### Solving a DIMACS encoded SAT problem
 	microsat DIMACS_FILE
 
+### Evaluate system decisions
+    microsat --c DIMACS_FILE
+
+### Evaluate buildability of a given configuration
+    microsat --c_sat DIMACS_FILE
+
 ## Original License(s)
 ### The MIT License
 
