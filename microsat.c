@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, CONFIG = 30 };
+enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
 enum MODES { MODE_SOLVE = 0, MODE_CONFIG = 1, MODE_CHECK = 2 };
 
@@ -202,14 +202,14 @@ void checkBuildability (struct solver* S) {
 int checkConfiguration (struct solver* S) {
   for (int i = 0; i < S->nAssignments; i++) {
     if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
-      return 0; }
+      return UNSAT; }
     for (int j = 0; j < S->nDeadVars; j++) {
       if (S->deadVars[j] == -S->assignments[i]) {
-        return 0; } }
+        return UNSAT; } }
     assign (S, &S->assignments[i], 1);
     if (!evaluateClauses (S)) {
-      return 0; } }
-  return 1; }
+      return UNSAT; } }
+  return SAT; }
 
 int solve (struct solver* S) {                                      // Determine satisfiability
   int decision = S->head;                                           // Initialize the solver
@@ -316,12 +316,14 @@ int main (int argc, char** argv) {                                              
 
   struct solver S;                                                                        // Create the solver datastructure
 
-  if (parse (&S, argv[1]) == UNSAT)                             printf("s UNSATISFIABLE\n"),                          exit (UNSAT);     // Parse the DIMACS file
+  if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
 
-  if      (MODE == MODE_CONFIG) { evaluateSystemDecisions (&S), printSystemDecisions (&S),    checkBuildability (&S), exit (CONFIG); }
-  else if (MODE == MODE_CHECK) {
-    if (checkConfiguration (&S) == 1) {                         printf ("s SATISFIABLE\n"),   checkBuildability (&S), exit (SAT); }
-    else {                                                      printf ("s UNSATISFIABLE\n"),                         exit (UNSAT); } }
+  if (MODE == MODE_CHECK || MODE == MODE_CONFIG) {
+    if (checkConfiguration (&S) == UNSAT) printf ("s UNSATISFIABLE\n"), exit (UNSAT);
+    else {
+      printf ("s SATISFIABLE\n"), checkBuildability (&S);
+      if (MODE == MODE_CONFIG) evaluateSystemDecisions (&S), printSystemDecisions (&S);
+      exit (SAT); } }
   else if (MODE == MODE_SOLVE) {
-    if (solve (&S)          == UNSAT)                           printf("s UNSATISFIABLE\n"),                          exit (UNSAT);     // Solve without limit (number of conflicts)
-    else                                                        printf("s SATISFIABLE\n"),                            exit (SAT); } }   // and print whether the formula has a solution
+    if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
+    else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution
