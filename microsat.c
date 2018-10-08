@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20 };
+enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
 enum MODES { MODE_SOLVE = 0, MODE_CONFIG = 1, MODE_CHECK = 2 };
 
@@ -167,6 +167,28 @@ int evaluateClauses (struct solver* S) {
         return clauseStatus; } } }
   return clauseStatus; }
 
+int checkConfiguration (struct solver* S) {
+  for (int i = 0; i < S->nAssignments; i++) {
+    if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
+      return UNSAT; }
+    for (int j = 0; j < S->nDeadVars; j++) {
+      if (S->deadVars[j] == -S->assignments[i]) {
+        return UNSAT; } }
+    assign (S, &S->assignments[i], 1);
+    if (!evaluateClauses (S)) {
+      return UNSAT; } }
+  return SAT; }
+
+int checkBuildability (struct solver* S) {
+  if (!allVariablesAssigned (S)) {
+    for (int i = 1; i <= S->nVars; i++) {
+      if (!S->model[i] && !S->false[i]) {
+        int lemma = -i;
+        assign (S, &lemma, 0);
+        if (!evaluateClauses (S)) {
+            return INCOMPLETE; } } } }
+  return BUILDABLE; }
+
 void evaluateSystemDecisions (struct solver* S) {
   for (int i = 0; i < S->nDeadVars; i++) {
     assign (S, &S->deadVars[i], 1); }
@@ -186,30 +208,6 @@ void printSystemDecisions (struct solver* S) {
       else if (S->false[i] == IMPLIED) {
       printf (" %i", -i); } }
   printf ("\n"); }
-
-void checkBuildability (struct solver* S) {
-  int buildable = 1;
-  if (!allVariablesAssigned (S)) {
-    for (int i = 1; i <= S->nVars; i++) {
-      if (!S->model[i] && !S->false[i]) {
-        int lemma = -i;
-        assign (S, &lemma, 0);
-        if (!evaluateClauses (S)) {
-            buildable = 0;
-            break; } } } }
-  if (buildable) printf ("s BUILDABLE\n"); }
-
-int checkConfiguration (struct solver* S) {
-  for (int i = 0; i < S->nAssignments; i++) {
-    if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
-      return UNSAT; }
-    for (int j = 0; j < S->nDeadVars; j++) {
-      if (S->deadVars[j] == -S->assignments[i]) {
-        return UNSAT; } }
-    assign (S, &S->assignments[i], 1);
-    if (!evaluateClauses (S)) {
-      return UNSAT; } }
-  return SAT; }
 
 int solve (struct solver* S) {                                      // Determine satisfiability
   int decision = S->head;                                           // Initialize the solver
@@ -320,10 +318,11 @@ int main (int argc, char** argv) {                                              
 
   if (MODE == MODE_CHECK || MODE == MODE_CONFIG) {
     if (checkConfiguration (&S) == UNSAT) printf ("s UNSATISFIABLE\n"), exit (UNSAT);
+    else if (checkBuildability (&S) == INCOMPLETE) printf ("s INCOMPLETE\n"), exit (INCOMPLETE);
     else {
-      printf ("s SATISFIABLE\n"), checkBuildability (&S);
+      printf ("s BUILDABLE\n");
       if (MODE == MODE_CONFIG) evaluateSystemDecisions (&S), printSystemDecisions (&S);
-      exit (SAT); } }
+      exit (BUILDABLE); } }
   else if (MODE == MODE_SOLVE) {
     if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
     else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution
