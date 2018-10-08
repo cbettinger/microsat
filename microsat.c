@@ -4,15 +4,15 @@
 
 enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, CONFIG = 30 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
-enum MODES {CONFIG_SYS = 1, CONFIG_CHECK = 2};
+enum MODES { MODE_SOLVE = 0, MODE_CONFIG = 1, MODE_CHECK = 2 };
 
 const int MEM_MAX = 1 << 30;
-int MODE = 0;
+int MODE = MODE_SOLVE;
 
 struct solver { // The variables in the struct are described in the allocate procedure
   int  *DB, nVars, nClauses, mem_used, mem_fixed, maxLemmas, nLemmas, *buffer, nConflicts, *model,
        *reason, *falseStack, *false, *first, *forced, *processed, *assigned, *next, *prev, head, res, fast, slow,
-       nDFeatures, *dFeatures, nUAssignment, *uAssignment; };
+       nDeadVars, *deadVars, nAssignments, *assignments; };
 
 void unassign (struct solver* S, int lit) { S->false[lit] = 0; }   // Unassign the literal
 
@@ -143,7 +143,7 @@ int allVariablesAssigned (struct solver* S) {
   for (int i = -S->nVars; i <= S->nVars; i++) {
     if (S->false[i]) nVarsAssigned++; }
   return nVarsAssigned == S->nVars; }
-  
+
 int evaluateClauses (struct solver* S) {
   int clauseStatus = 1;
   int lit = *(S->processed++);
@@ -166,32 +166,20 @@ int evaluateClauses (struct solver* S) {
         clauseStatus = 0;
         return clauseStatus; } } }
   return clauseStatus; }
-  
-void checkBuildability (struct solver* S) {
-				int buildable = 1;
-				if (!allVariablesAssigned (S)) {
-				  for (int i = 1; i <= S->nVars; i++) {
-				    if (!S->model[i] && !S->false[i]) {
-				      int lemma = -i;
-				      assign (S, &lemma, 0);
-				      if (!evaluateClauses (S)) {
-            buildable = 0;
-				        break; } } } }
-				if (buildable) printf ("%s\n", "s BUILDABLE"); }
 
 void evaluateSystemDecisions (struct solver* S) {
-  for (int i = 0; i < S->nDFeatures; i++) {
-    assign (S, &S->dFeatures[i], 1); }
+  for (int i = 0; i < S->nDeadVars; i++) {
+    assign (S, &S->deadVars[i], 1); }
   propagate (S);
 
-  for (int i = S->nUAssignment-1; i >= 0; i--) {
-    int* lemma = &S->uAssignment[i];
-    if (!S->model[S->uAssignment[i]] && !S->false[S->uAssignment[i]]) {
+  for (int i = S->nAssignments-1; i >= 0; i--) {
+    int* lemma = &S->assignments[i];
+    if (!S->model[S->assignments[i]] && !S->false[S->assignments[i]]) {
       assign (S, lemma, 0);
       propagate (S); } } }
 
 void printSystemDecisions (struct solver* S) {
-  printf ("%s", "v");
+  printf ("v");
   for (int i = 1; i <= S->nVars; i++) {
     if (S->model[i] && (S->false[-i] == IMPLIED)) {
       printf (" %i", i); }
@@ -199,37 +187,32 @@ void printSystemDecisions (struct solver* S) {
       printf (" %i", -i); } }
   printf ("\n"); }
 
+void checkBuildability (struct solver* S) {
+  int buildable = 1;
+  if (!allVariablesAssigned (S)) {
+    for (int i = 1; i <= S->nVars; i++) {
+      if (!S->model[i] && !S->false[i]) {
+        int lemma = -i;
+        assign (S, &lemma, 0);
+        if (!evaluateClauses (S)) {
+            buildable = 0;
+            break; } } } }
+  if (buildable) printf ("s BUILDABLE\n"); }
+
 int checkConfiguration (struct solver* S) {
-  int satisfiable = 1;
-  for (int i = 0; i < S->nUAssignment; i++) {
-    if ((S->uAssignment[i] < 0 && S->false[S->uAssignment[i]]) || (S->uAssignment[i] > 0 && S->false[S->uAssignment[i]])) {
-      satisfiable = 0;
-      return satisfiable; }
-    for (int j = 0; j < S->nDFeatures; j++) {
-      if (S->dFeatures[j] == -S->uAssignment[i]) {
-        satisfiable = 0;
-        return satisfiable; } }
-    assign (S, &S->uAssignment[i], 1);
+  for (int i = 0; i < S->nAssignments; i++) {
+    if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
+      return 0; }
+    for (int j = 0; j < S->nDeadVars; j++) {
+      if (S->deadVars[j] == -S->assignments[i]) {
+        return 0; } }
+    assign (S, &S->assignments[i], 1);
     if (!evaluateClauses (S)) {
-      satisfiable = 0;
-      return satisfiable; } }
-  return satisfiable; }
+      return 0; } }
+  return 1; }
 
 int solve (struct solver* S) {                                      // Determine satisfiability
-  int decision = S->head; S->res = 0;                               // Initialize the solver
-
-  if (MODE == CONFIG_SYS) {
-    evaluateSystemDecisions (S);
-    checkBuildability(S);
-    printSystemDecisions (S);
-    exit (CONFIG); }
-  else if (MODE == CONFIG_CHECK) {
-    if (checkConfiguration (S) == 1) {
-      printf ("%s", "s SATISFIABLE\n");
-      checkBuildability (S); }
-    else { printf ("%s", "s UNSATISFIABLE\n"); }
-    exit (CONFIG); }
-
+  int decision = S->head;                                           // Initialize the solver
   for (;;) {                                                        // Main solve loop
     int old_nLemmas = S->nLemmas;                                   // Store nLemmas to see whether propagate adds lemmas
     if (propagate (S) == UNSAT) return UNSAT;                       // Propagation returns UNSAT for a root level conflict
@@ -251,8 +234,7 @@ int solve (struct solver* S) {                                      // Determine
 void initDatabase (struct solver* S) {
   S->mem_used       = 0;                              // The number of integers allocated in the DB
   S->DB = (int *) malloc (sizeof (int) * MEM_MAX);    // Allocate the initial database
-  S->DB[S->mem_used++] = 0;                           // Make sure there is a 0 before the clauses are loaded.
-}
+  S->DB[S->mem_used++] = 0; }                         // Make sure there is a 0 before the clauses are loaded
 
 void initCDCL (struct solver* S, int n, int m) {
   if (n < 1)      n = 1;                  // The code assumes that there is at least one variable
@@ -261,6 +243,7 @@ void initCDCL (struct solver* S, int n, int m) {
   S->nLemmas        = 0;                  // The number of learned clauses -- redundant means learned
   S->nConflicts     = 0;                  // Under of conflicts which is used to updates scores
   S->maxLemmas      = 2000;               // Initial maximum number of learnt clauses
+  S->res = 0;                             // Initialize restarts
   S->fast = S->slow = 1 << 24;            // Initialize the fast and slow moving averages
 
   S->model       = getMemory (S, n+1); // Full assignment of the (Boolean) variables (initially set to false)
@@ -286,19 +269,25 @@ int parse (struct solver* S, char* filename) {                            // Par
   if (input == NULL) printf ("c FILE NOT FOUND\n"), exit (ERROR);         // Exit if file not found
 
   initDatabase(S);
-  if (MODE != 0) {
-    int i = 0;
-    if ((fscanf (input, " c d%i v%i \n", &S->nDFeatures, &S->nUAssignment)) == 2) {
-      S->dFeatures = getMemory (S, S->nDFeatures);
-      S->uAssignment = getMemory (S, S->nUAssignment);
-      fscanf (input, " d");
-      while (i < S->nDFeatures) {
-        fscanf (input, "%i", &tmp);
-        S->dFeatures[i++] = -tmp; }
+
+  if (MODE == MODE_CONFIG || MODE == MODE_CHECK) {                        // Parse the partial assignment
+    int i;
+
+    if ((fscanf (input, " c d%i", &S->nDeadVars)) == 1) {                 // Parse "dead" (i.e. always false) variables
+      S->deadVars = getMemory (S, S->nDeadVars);
       i = 0;
-      fscanf (input, " v");
-      while (i < S->nUAssignment) {
-        fscanf (input, "%i", &S->uAssignment[i++]); } } }
+      while (i < S->nDeadVars) {
+        fscanf (input, "%i", &tmp);
+        S->deadVars[i++] = -tmp; }
+    }
+
+    if ((fscanf (input, " c v%i", &S->nAssignments)) == 1) {              // Parse assigned variables
+      S->assignments = getMemory (S, S->nAssignments);
+      i = 0;
+      while (i < S->nAssignments) {
+        fscanf (input, "%i", &S->assignments[i++]); }
+    }
+  }
 
   do { tmp = fscanf (input, " p cnf %i %i \n", &S->nVars, &S->nClauses);  // Find the first non-comment line
     if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }    // In case a comment line was found
@@ -319,12 +308,20 @@ int parse (struct solver* S, char* filename) {                            // Par
   fclose (input);                                          // Close the formula file
   return SAT; }                                            // Return that no conflict was observed
 
-int main (int argc, char** argv) {                                                   // The main procedure for a STANDALONE solver
-  if (argc == 1) printf ("Usage: microsat DIMACS_FILE\n"), exit (OK);                // Print usage if no argument is given
-  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);              // Print version if argument --version is given
-  else if (!strcmp (argv[1], "--c")) MODE = CONFIG_SYS, ++argv;                      // Mode to generate systemdecisions
-  else if (!strcmp (argv[1], "--c_sat")) MODE = CONFIG_CHECK, ++argv;                // Mode to check configuration
-  struct solver S;	                                                                 // Create the solver datastructure
-  if      (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);  // Parse the DIMACS file in argv[1]
-  else if (solve (&S)          == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);  // Solve without limit (number of conflicts)
-  else                                   printf("s SATISFIABLE\n"), exit (SAT); }    // And print whether the formula has a solution
+int main (int argc, char** argv) {                                                        // The main procedure for a STANDALONE solver
+  if (argc == 1) printf ("Usage: microsat [--config|--check] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
+  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                   // Print version if argument --version is given
+  else if (!strcmp (argv[1], "--config")) MODE = MODE_CONFIG, ++argv;                     // Set mode to generate system decisions
+  else if (!strcmp (argv[1], "--check")) MODE = MODE_CHECK, ++argv;                       // Set mode to check a configuration
+
+  struct solver S;                                                                        // Create the solver datastructure
+
+  if (parse (&S, argv[1]) == UNSAT)                             printf("s UNSATISFIABLE\n"),                          exit (UNSAT);     // Parse the DIMACS file
+
+  if      (MODE == MODE_CONFIG) { evaluateSystemDecisions (&S), printSystemDecisions (&S),    checkBuildability (&S), exit (CONFIG); }
+  else if (MODE == MODE_CHECK) {
+    if (checkConfiguration (&S) == 1) {                         printf ("s SATISFIABLE\n"),   checkBuildability (&S), exit (SAT); }
+    else {                                                      printf ("s UNSATISFIABLE\n"),                         exit (UNSAT); } }
+  else if (MODE == MODE_SOLVE) {
+    if (solve (&S)          == UNSAT)                           printf("s UNSATISFIABLE\n"),                          exit (UNSAT);     // Solve without limit (number of conflicts)
+    else                                                        printf("s SATISFIABLE\n"),                            exit (SAT); } }   // and print whether the formula has a solution
