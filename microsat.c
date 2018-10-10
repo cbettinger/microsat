@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40 };
+enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40, INVALID = 50 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
 enum MODES { MODE_SOLVE = 0, MODE_CONFIG = 1, MODE_CHECK = 2 };
 
@@ -170,14 +170,14 @@ int evaluateClauses (struct solver* S) {
 int checkConfiguration (struct solver* S) {
   for (int i = 0; i < S->nAssignments; i++) {
     if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
-      return UNSAT; }
+      return INVALID; }
     for (int j = 0; j < S->nDeadVars; j++) {
       if (S->deadVars[j] == -S->assignments[i]) {
-        return UNSAT; } }
+        return INVALID; } }
     assign (S, &S->assignments[i], 1);
     if (!evaluateClauses (S)) {
-      return UNSAT; } }
-  return SAT; }
+      return INVALID; } }
+  return OK; }
 
 int checkBuildability (struct solver* S) {
   if (!allVariablesAssigned (S)) {
@@ -320,7 +320,7 @@ int main (int argc, char** argv) {                                              
   if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
 
   if (MODE == MODE_CHECK || MODE == MODE_CONFIG) {
-    if (checkConfiguration (&S) == UNSAT) printf ("s UNSATISFIABLE\n"), exit (UNSAT);
+    if (checkConfiguration (&S) == INVALID) printf ("s INVALID\n"), exit (INVALID);
     else if (checkBuildability (&S) == INCOMPLETE) printf ("s INCOMPLETE\n"), exit (INCOMPLETE);
     else {
       printf ("s BUILDABLE\n");
