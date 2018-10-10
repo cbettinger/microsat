@@ -311,7 +311,7 @@ int parse (struct solver* S, char* filename) {                            // Par
   return SAT; }                                            // Return that no conflict was observed
 
 int main (int argc, char** argv) {                                                                      // The main procedure
-  if (argc == 1) printf ("Usage: microsat [--version] [--config | --check DIMACS_FILE] \n"), exit (OK); // Print usage if no argument is given
+  if (argc == 1) printf ("Usage: microsat [--version] [--config | --check] DIMACS_FILE\n"), exit (OK); // Print usage if no argument is given
   if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                 // Print version if argument --version is given
   else if (!strcmp (argv[1], "--config")) MODE = MODE_CONFIG, ++argv;                                   // Set mode to generate system decisions
   else if (!strcmp (argv[1], "--check")) MODE = MODE_CHECK, ++argv;                                     // Set mode to check a configuration

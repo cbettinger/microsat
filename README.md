@@ -12,6 +12,9 @@ This fork adds the following features:
 	./configure && sudo make install
 
 ## Usage
+### Print usage
+	microsat
+
 ### Version info
 	microsat --version
 
