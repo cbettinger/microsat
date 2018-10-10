@@ -1,0 +1,23 @@
+c Feature Model: 03382a39-bf2e-4fa0-81e3-872aa9a83b5c
+c Features:
+c 1: A
+c 2: B
+c 3: C
+c 4: B1
+c 5: B2
+c 6: C1 (dead)
+c 7: C2
+c v3 1 2 4
+c d1 6
+p cnf 7 11
+1 0
+-1 2 0
+-4 2 0
+-5 2 0
+-6 3 0
+-7 3 0
+-5 7 0
+-2 4 5 0
+-3 6 7 0
+-6 -7 0
+-2 -6 0
