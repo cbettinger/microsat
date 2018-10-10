@@ -30,9 +30,9 @@ rm -f makefile
 cat > makefile <<EOF
 microsat: microsat.c makefile
 	$CC $CFLAGS -o microsat microsat.c
-clean:
-	rm -f microsat makefile
 install: microsat
 	chmod +x microsat
 	cp microsat /usr/local/bin
+clean:
+	rm -f microsat makefile
 EOF
