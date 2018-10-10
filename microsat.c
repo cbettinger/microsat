@@ -262,45 +262,33 @@ void initCDCL (struct solver* S, int n, int m) {
     S->first[i] = S->first[-i] = END; }                    // and first (watch pointers).
   S->head = n; }                                           // Initialize the head of the double-linked list
 
-int parse (struct solver* S, char* filename) {                             // Parse the formula and initialize
-  int tmp; FILE* input = fopen (filename, "r");                            // Read the CNF file
-  if (input == NULL) printf ("c FILE NOT FOUND\n"), exit (ERROR);          // Exit if file not found
+int parse (struct solver* S, char* filename) {                            // Parse the formula and initialize
+  int tmp; FILE* input = fopen (filename, "r");                           // Read the CNF file
+  if (input == NULL) printf ("c FILE NOT FOUND\n"), exit (ERROR);         // Exit if file not found
 
   initDatabase(S);
 
-  if (MODE == MODE_CONFIG || MODE == MODE_CHECK) {                         // Parse the partial assignment
-    int i, deadVarsFound = 0, assignmentsFound = 0;
+  if (MODE == MODE_CONFIG || MODE == MODE_CHECK) {                        // Parse the partial assignment
+    int i;
 
-    if (deadVarsFound == 0) {                                              // Parse "dead" (i.e. always false) variables
-      do { tmp = fscanf (input, " c d%i", &S->nDeadVars);
-        if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); } // Skip rest of line
-      while (tmp != 1 && tmp != EOF);
+    do { tmp = fscanf (input, " c d%i", &S->nDeadVars);                   // Parse "dead" (i.e. always false) variables
+      if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }  // Skip rest of line
+    while (tmp != 1 && tmp != EOF);
+    S->deadVars = getMemory (S, S->nDeadVars);
+    i = 0;
+    while (i < S->nDeadVars) {
+      fscanf (input, "%i", &tmp);
+      S->deadVars[i++] = -tmp; }
+    fseek (input, 0, SEEK_SET);                                           // Reset file position
 
-      S->deadVars = getMemory (S, S->nDeadVars);
-      i = 0;
-      while (i < S->nDeadVars) {
-        fscanf (input, "%i", &tmp);
-        S->deadVars[i++] = -tmp; }
-
-      deadVarsFound = 1;
-      fseek (input, 0, SEEK_SET);                                          // Reset file position
-    }
-
-    if (assignmentsFound == 0) {                                           // Parse assigned variables
-      do { tmp = fscanf (input, " c v%i", &S->nAssignments);
-        if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); } // Skip rest of line
-      while (tmp != 1 && tmp != EOF);
-
-      S->assignments = getMemory (S, S->nAssignments);
-      i = 0;
-      while (i < S->nAssignments) {
-        fscanf (input, "%i", &S->assignments[i++]); }
-
-      assignmentsFound = 1;
-      fseek (input, 0, SEEK_SET);                                          // Reset file position
-    }
-
-    fseek (input, 0, SEEK_SET);                                            // Reset file position
+    do { tmp = fscanf (input, " c v%i", &S->nAssignments);                // Parse assigned variables
+      if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }  // Skip rest of line
+    while (tmp != 1 && tmp != EOF);
+    S->assignments = getMemory (S, S->nAssignments);
+    i = 0;
+    while (i < S->nAssignments) {
+      fscanf (input, "%i", &S->assignments[i++]); }
+    fseek (input, 0, SEEK_SET);                                           // Reset file position
   }
 
   do { tmp = fscanf (input, " p cnf %i %i \n", &S->nVars, &S->nClauses);  // Find the first non-comment line
