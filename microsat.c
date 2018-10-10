@@ -4,7 +4,7 @@
 
 enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40, INVALID = 50 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
-enum MODES { MODE_SOLVE = 0, MODE_CONFIG = 1, MODE_CHECK = 2 };
+enum MODES { MODE_SOLVE = 0, MODE_PROPAGATE = 1, MODE_STATUS = 2 };
 
 const int MEM_MAX = 1 << 30;
 int MODE = MODE_SOLVE;
@@ -167,29 +167,34 @@ int evaluateClauses (struct solver* S) {
         return clauseStatus; } } }
   return clauseStatus; }
 
-int checkConfiguration (struct solver* S) {
+int evaluateAssignment (struct solver* S) {
   for (int i = 0; i < S->nAssignments; i++) {
     if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
-      return INVALID; }
+      return 0; }
     for (int j = 0; j < S->nDeadVars; j++) {
       if (S->deadVars[j] == -S->assignments[i]) {
-        return INVALID; } }
+        return 0; } }
     assign (S, &S->assignments[i], 1);
     if (!evaluateClauses (S)) {
-      return INVALID; } }
-  return OK; }
+      return 0; } }
+  return 1; }
 
-int checkBuildability (struct solver* S) {
+int evaluateBuildability (struct solver* S) {
   if (!allVariablesAssigned (S)) {
     for (int i = 1; i <= S->nVars; i++) {
       if (!S->model[i] && !S->false[i]) {
         int lemma = -i;
         assign (S, &lemma, 0);
         if (!evaluateClauses (S)) {
-            return INCOMPLETE; } } } }
-  return BUILDABLE; }
+            return 0; } } } }
+  return 1; }
 
-void evaluateSystemDecisions (struct solver* S) {
+int checkStatus (struct solver* S) {
+  if (!evaluateAssignment (S)) return INVALID;
+  else if (!evaluateBuildability (S)) return INCOMPLETE;
+  else return BUILDABLE; }
+
+void evaluateDecisions (struct solver* S) {
   for (int i = 0; i < S->nDeadVars; i++) {
     assign (S, &S->deadVars[i], 1); }
   propagate (S);
@@ -200,7 +205,7 @@ void evaluateSystemDecisions (struct solver* S) {
       assign (S, lemma, 0);
       propagate (S); } } }
 
-void printSystemDecisions (struct solver* S) {
+void printDecisions (struct solver* S) {
   printf ("v");
   for (int i = 1; i <= S->nVars; i++) {
     if (S->model[i] && (S->false[-i] == IMPLIED)) {
@@ -268,7 +273,7 @@ int parse (struct solver* S, char* filename) {                            // Par
 
   initDatabase(S);
 
-  if (MODE == MODE_CONFIG || MODE == MODE_CHECK) {                        // Parse the partial assignment
+  if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS) {                    // Parse the additional comment lines
     int i;
 
     do { tmp = fscanf (input, " c d%i", &S->nDeadVars);                   // Parse "dead" (i.e. always false) variables
@@ -310,22 +315,22 @@ int parse (struct solver* S, char* filename) {                            // Par
   fclose (input);                                          // Close the formula file
   return SAT; }                                            // Return that no conflict was observed
 
-int main (int argc, char** argv) {                                                                      // The main procedure
-  if (argc == 1) printf ("Usage: microsat [--version] [--config | --check] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
-  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                 // Print version if argument --version is given
-  else if (!strcmp (argv[1], "--config")) MODE = MODE_CONFIG, ++argv;                                   // Set mode to generate system decisions
-  else if (!strcmp (argv[1], "--check")) MODE = MODE_CHECK, ++argv;                                     // Set mode to check a configuration
+int main (int argc, char** argv) {                                                                          // The main procedure
+  if (argc == 1) printf ("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
+  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                     // Print version if argument --version is given
+  else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
+  else if (!strcmp (argv[1], "--propagate")) MODE = MODE_PROPAGATE, ++argv;                                 // Set mode to propagate an assignment
 
   struct solver S;                                                                        // Create the solver datastructure
   if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
 
-  if (MODE == MODE_CHECK || MODE == MODE_CONFIG) {
-    if (checkConfiguration (&S) == INVALID) printf ("s INVALID\n"), exit (INVALID);
-    else if (checkBuildability (&S) == INCOMPLETE) printf ("s INCOMPLETE\n"), exit (INCOMPLETE);
-    else {
-      printf ("s BUILDABLE\n");
-      if (MODE == MODE_CONFIG) evaluateSystemDecisions (&S), printSystemDecisions (&S);
-      exit (BUILDABLE); } }
+  if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS) {
+    int status = checkStatus (&S);
+    if (MODE == MODE_PROPAGATE) evaluateDecisions (&S), printDecisions (&S);
+    if (status == INVALID) printf ("s INVALID\n");
+    else if (status == INCOMPLETE) printf ("s INCOMPLETE\n");
+    else printf ("s BUILDABLE\n");
+    exit (status); }
   else if (MODE == MODE_SOLVE) {
     if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
     else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution

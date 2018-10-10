@@ -2,8 +2,11 @@
 [microsat](https://github.com/marijnheule/microsat) is a simple CDCL SAT solver by Marijn Heule and Armin Biere.
 
 This fork adds the following features:
-* Check *buildability* of a partial assignment, i.e. the satisfiability of a SAT problem with a explicit partial assignment and all undecided variables implicitely set to false
-* Generate a *configuration*: Infer all consequent variable decisions based on a partial assignment of the SAT problem variables
+* Deduce variable decisions by propagating an (partial) assignment of the SAT problem variables
+* Check the status of a (partial) assignment of the SAT problem variables
+	* `INVALID`: The problem will evaluate to *false* regarding the partial assignment.
+	* `INCOMPLETE`: The partial assignment is neither `INVALID` nor `BUILDABLE`.
+	* `BUILDABLE`: The problem will evaluate to *true* after completing the assignment by setting all undecided variables implicitely to *false*.
 
 ## Build
 	./configure && make
@@ -21,20 +24,23 @@ This fork adds the following features:
 ### Check satisfiability of a DIMACS encoded SAT problem
 	microsat DIMACS_FILE
 
-### Check buildability of a partial assignment
-	microsat --check DIMACS_FILE
+### Propagate an assignment
+	microsat --propagate DIMACS_FILE
 
-### Generate a configuration and check buildability of a partial assignment
-	microsat --config DIMACS_FILE
+### Check status of an assignment
+	microsat --status DIMACS_FILE
 
 ### DIMACS file
-The partial assignment of variables is denoted as DIMACS comment lines which have to be added before the problem line:
+The partial assignment is denoted as a DIMACS comment line which has to be added somewhere before the problem line:
 
-	c d<NUMBER_OF_DEAD_VARIABLES> <DEAD_VARIABLES>
 	c v<NUMBER_OF_ASSIGNED_VARIABLES> <ASSIGNED_VARIABLES>
 
+In order to work the solver needs to know the "dead" variables, i.e. variables that are always *false*. This could be determined internally but would increase runtime radically (especially if executed multiple times with the same SAT problem). Therefore they are presumed:
+	
+	c d<NUMBER_OF_DEAD_VARIABLES> <DEAD_VARIABLES>
+	
 For example:
 
-	c d1 26
 	c v4 5 -7 18 -20
+	c d1 26
 	p cnf ...
