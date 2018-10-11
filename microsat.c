@@ -192,48 +192,124 @@ int evaluateClauses (struct solver* S) {
         return clauseStatus; } } }
   return clauseStatus; }
 
-int evaluateAssignment (struct solver* S) {
-  for (int i = 0; i < S->nAssignments; i++) {
-    if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
-      return 0; }
-    for (int j = 0; j < S->nDeadVars; j++) {
-      if (S->deadVars[j] == -S->assignments[i]) {
-        return 0; } }
-    assign (S, &S->assignments[i], 1);
-    if (!evaluateClauses (S)) {
-      return 0; } }
-  return 1; }
-
-int evaluateBuildability (struct solver* S) {
-  if (!allVariablesAssigned (S)) {
-    for (int i = 1; i <= S->nVars; i++) {
-      if (!S->model[i] && !S->false[i]) {
-        int lemma = -i;
-        assign (S, &lemma, 0);
-        if (!evaluateClauses (S)) {
-            return 0; } } } }
-  return 1; }
-
-void propagateAssignment(struct solver *S)
+int solve(struct solver *S)																			// Determine satisfiability
 {
-	for (int i = 0; i < S->nDeadVars; i++)
+	int decision = S->head;																			// Initialize the solver
+	for (;;)																						// Main solve loop
+	{
+		int old_nLemmas = S->nLemmas;																// Store nLemmas to see whether propagate adds lemmas
+
+		if (propagate(S) == UNSAT)
+			return UNSAT;																			// Propagation returns UNSAT for a root level conflict
+
+		if (S->nLemmas > old_nLemmas)																// If the last decision caused a conflict
+		{
+			decision = S->head;																		// Then reset the decision heuristic to head
+			if (S->fast > (S->slow / 100) * 125)													// If fast average is substantially larger than slow average
+			{
+				S->nRestarts = 0;																	// Then restart and update the averages
+				S->fast = (S->slow / 100) * 125;
+				restart(S);
+
+				if (S->nLemmas > S->maxLemmas)														// Reduce the DB when it contains too many lemmas
+					reduceDB(S, 6);
+			}
+		}
+
+		while (S->false[decision] || S->false[-decision])											// As long as the temporary decision is assigned
+		{
+			decision = S->prev[decision];															// Replace it with the next variable in the decision list
+		}
+
+		if (decision == 0)																			// If the end of the list is reached
+			return SAT;																				// Then a solution is found
+
+		decision = S->model[decision] ? decision : -decision;										// Otherwise, assign the decision variable based on the model
+		S->false[-decision] = 1;																	// Assign the decision literal to true
+		*(S->assigned++) = -decision;																// And push it on the assigned stack
+		decision = abs(decision);																	// Decisions have no reason clauses
+		S->reason[decision] = 0;
+	}
+}
+
+int evaluateAssignment(struct solver *S)
+{
+	for (int i = 0; i < S->nAssignments; i++)
+	{
+		if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]]))
+		{
+			return 0;
+		}
+
+		for (int j = 0; j < S->nDeadVars; j++)
+		{
+			if (S->deadVars[j] == -S->assignments[i])
+			{
+				return 0;
+			}
+		}
+
+		assign(S, &S->assignments[i], 1);
+		if (!evaluateClauses(S))
+		{
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+int evaluateBuildability(struct solver *S)
+{
+	if (!allVariablesAssigned(S))
+	{
+		for (int i = 1; i <= S->nVars; i++)
+		{
+			if (!S->model[i] && !S->false[i])
+			{
+				int lemma = -i;
+				assign(S, &lemma, 0);
+				if (!evaluateClauses(S))
+				{
+					return 0;
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
+int checkStatus(struct solver *S)																	// Return status of a (partial) assignment
+{
+	if (!evaluateAssignment(S))
+		return INVALID;
+	else if (!evaluateBuildability(S))
+		return INCOMPLETE;
+	else
+		return BUILDABLE;
+}
+
+void propagateAssignment(struct solver *S)															// Propagate a (partial) assignment
+{
+	for (int i = 0; i < S->nDeadVars; i++)															// Assign dead variables
 	{
 		assign(S, &S->deadVars[i], 1);
 	}
-	propagate(S);
+	propagate(S);																					// Propagate
 
-	for (int i = S->nAssignments - 1; i >= 0; i--)
+	for (int i = S->nAssignments - 1; i >= 0; i--)													// Assign decided variables
 	{
 		int *lemma = &S->assignments[i];
 		if (!S->model[S->assignments[i]] && !S->false[S->assignments[i]])
 		{
 			assign(S, lemma, 0);
-			propagate(S);
+			propagate(S);																			// Propagate
 		}
 	}
 }
 
-void printImpliedDecisions(struct solver *S)
+void printImpliedDecisions(struct solver *S)														// Print all variable decisions implied by propagation
 {
 	printf("v");
 	for (int i = 1; i <= S->nVars; i++)
@@ -249,36 +325,6 @@ void printImpliedDecisions(struct solver *S)
 	}
 	printf("\n");
 }
-
-int checkStatus(struct solver *S)
-{
-	if (!evaluateAssignment(S))
-		return INVALID;
-	else if (!evaluateBuildability(S))
-		return INCOMPLETE;
-	else
-		return BUILDABLE;
-}
-
-int solve (struct solver* S) {                                      // Determine satisfiability
-  int decision = S->head;                                           // Initialize the solver
-  for (;;) {                                                        // Main solve loop
-    int old_nLemmas = S->nLemmas;                                   // Store nLemmas to see whether propagate adds lemmas
-    if (propagate (S) == UNSAT) return UNSAT;                       // Propagation returns UNSAT for a root level conflict
-
-    if (S->nLemmas > old_nLemmas) {                                 // If the last decision caused a conflict
-      decision = S->head;                                           // Reset the decision heuristic to head
-      if (S->fast > (S->slow / 100) * 125) {                        // If fast average is substantially larger than slow average
-        S->nRestarts = 0; S->fast = (S->slow / 100) * 125; restart (S);   // Restart and update the averages
-        if (S->nLemmas > S->maxLemmas) reduceDB (S, 6); } }         // Reduce the DB when it contains too many lemmas
-
-    while (S->false[decision] || S->false[-decision]) {             // As long as the temporary decision is assigned
-      decision = S->prev[decision]; }                               // Replace it with the next variable in the decision list
-    if (decision == 0) return SAT;                                  // If the end of the list is reached, then a solution is found
-    decision = S->model[decision] ? decision : -decision;           // Otherwise, assign the decision variable based on the model
-    S->false[-decision] = 1;                                        // Assign the decision literal to true (change to IMPLIED-1?)
-    *(S->assigned++) = -decision;                                   // And push it on the assigned stack
-    decision = abs(decision); S->reason[decision] = 0; } }          // Decisions have no reason clauses
 
 void initDB(struct solver *S)																		// Initialize the database
 {
@@ -440,7 +486,7 @@ int main(int argc, char **argv)																		// The main procedure
 	int status;
 	if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS)
 	{
-		if (MODE == MODE_PROPAGATE)																	// Print implied variable decisions due to propagation
+		if (MODE == MODE_PROPAGATE)																	// Print all variable decisions implied by propagation
 			propagateAssignment(&S), printImpliedDecisions(&S);
 
 		status = checkStatus(&S);																	// Check and print problem status
