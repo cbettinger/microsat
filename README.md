@@ -2,7 +2,7 @@
 [microsat](https://github.com/marijnheule/microsat) is a simple CDCL SAT solver by Marijn Heule and Armin Biere.
 
 This fork adds the following features:
-* Deduce variable decisions by propagating an (partial) assignment of the SAT problem variables
+* Deduce variable decisions by propagating a (partial) assignment of the SAT problem variables
 * Check the status of a (partial) assignment of the SAT problem variables
 	* `INVALID`: The problem will evaluate to *false* regarding the partial assignment.
 	* `INCOMPLETE`: The partial assignment is neither `INVALID` nor `BUILDABLE`.
