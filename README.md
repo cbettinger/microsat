@@ -44,3 +44,5 @@ For example:
 	c v4 5 -7 18 -20
 	c d1 26
 	p cnf ...
+
+Three demo files (one for each status described above) can be found in the *test* subdirectory.
