@@ -2,17 +2,42 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40, INVALID = 50 };
-enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
-enum MODES { MODE_SOLVE = 0, MODE_PROPAGATE = 1, MODE_STATUS = 2 };
+enum MODES																							// The application modes, set by command line options
+{
+	MODE_SOLVE = 0,
+	MODE_PROPAGATE = 1,
+	MODE_STATUS = 2
+};
 
-const int MEM_MAX = 1 << 30;
-int MODE = MODE_SOLVE;
+int MODE;
 
-struct solver { // The variables in the struct are described in the allocate procedure
-  int  *DB, nVars, nClauses, mem_used, mem_fixed, maxLemmas, nLemmas, *buffer, nConflicts, *model,
-       *reason, *falseStack, *false, *first, *forced, *processed, *assigned, *next, *prev, head, res, fast, slow,
-       nDeadVars, *deadVars, nAssignments, *assignments; };
+enum EXIT_CODES																						// The exit codes for the application
+{
+	ERROR = -1,
+	OK = 0,
+	SAT = 10,
+	UNSAT = 20,
+	BUILDABLE = 100,
+	INCOMPLETE = 150,
+	INVALID = 200
+};
+
+enum LITERAL_FLAGS																					// Flags for marking literals during solving process
+{
+	END = -9,
+	MARK = 2,
+	IMPLIED = 6
+};
+
+const int MEM_MAX = 1 << 30;																		// Maximal memory for the database: 2^30 Bytes = 1.073.741.824 Bytes = 1074 MBytes
+
+struct solver																						// The variables in the solver struct are described in the init...() functions
+{
+	int *DB, mem_used, mem_fixed,
+		nVars, nClauses, maxLemmas, nLemmas, nConflicts, nRestarts, fast, slow,
+		*model, *next, *prev, *clauseBuffer, *reason, *falseStack, *forced, *false, *processed, *assigned, *first, head,
+		nDeadVars, *deadVars, nAssignments, *assignments;
+};
 
 void unassign (struct solver* S, int lit) { S->false[lit] = 0; }   // Unassign the literal
 
@@ -81,7 +106,7 @@ int implied (struct solver* S, int lit) {                  // Check if lit(eral)
   S->false[lit] = IMPLIED; return 1; }                     // Mark and return that the literal is implied
 
 int* analyze (struct solver* S, int* clause) {         // Compute a resolvent from falsified clause
-  S->res++; S->nConflicts++;                           // Bump restarts and update the statistic
+  S->nRestarts++; S->nConflicts++;                           // Bump restarts and update the statistic
   while (*clause) bump (S, *(clause++));               // MARK all literals in the falsified clause
   while (S->reason[abs (*(--S->assigned))]) {          // Loop on variables on falseStack until the last decision
     if (S->false[*S->assigned] == MARK) {              // If the tail of the stack is MARK
@@ -96,7 +121,7 @@ int* analyze (struct solver* S, int* clause) {         // Compute a resolvent fr
   int* p = S->processed = S->assigned;                 // Loop from tail to front
   while (p >= S->forced) {                             // Only literals on the stack can be MARKed
     if ((S->false[*p] == MARK) && !implied (S, *p)) {  // If MARKed and not implied
-      S->buffer[size++] = *p; flag = 1; }              // Add literal to conflict clause buffer
+      S->clauseBuffer[size++] = *p; flag = 1; }              // Add literal to conflict clause buffer
     if (!S->reason[abs (*p)]) { lbd += flag; flag = 0; // Increase LBD for a decision with a true flag
       if (size == 1) S->processed = p; }               // And update the processed pointer
     S->false[*(p--)] = 1; }                            // Reset the MARK flag for all variables on the stack
@@ -107,8 +132,8 @@ int* analyze (struct solver* S, int* clause) {         // Compute a resolvent fr
   while (S->assigned > S->processed)                   // Loop over all unprocessed literals
     unassign (S, *(S->assigned--));                    // Unassign all lits between tail & head
   unassign (S, *S->assigned);                          // Assigned now equal to processed
-  S->buffer[size] = 0;                                 // Terminate the buffer (and potentially print clause)
-  return addClause (S, S->buffer, size, 0); }          // Add new conflict clause to redundant DB
+  S->clauseBuffer[size] = 0;                                 // Terminate the buffer (and potentially print clause)
+  return addClause (S, S->clauseBuffer, size, 0); }          // Add new conflict clause to redundant DB
 
 int propagate (struct solver* S) {                  // Performs unit propagation
   int forced = S->reason[abs (*S->processed)];      // Initialize forced flag
@@ -189,30 +214,51 @@ int evaluateBuildability (struct solver* S) {
             return 0; } } } }
   return 1; }
 
-int checkStatus (struct solver* S) {
-  if (!evaluateAssignment (S)) return INVALID;
-  else if (!evaluateBuildability (S)) return INCOMPLETE;
-  else return BUILDABLE; }
+void propagateAssignment(struct solver *S)
+{
+	for (int i = 0; i < S->nDeadVars; i++)
+	{
+		assign(S, &S->deadVars[i], 1);
+	}
+	propagate(S);
 
-void evaluateDecisions (struct solver* S) {
-  for (int i = 0; i < S->nDeadVars; i++) {
-    assign (S, &S->deadVars[i], 1); }
-  propagate (S);
+	for (int i = S->nAssignments - 1; i >= 0; i--)
+	{
+		int *lemma = &S->assignments[i];
+		if (!S->model[S->assignments[i]] && !S->false[S->assignments[i]])
+		{
+			assign(S, lemma, 0);
+			propagate(S);
+		}
+	}
+}
 
-  for (int i = S->nAssignments-1; i >= 0; i--) {
-    int* lemma = &S->assignments[i];
-    if (!S->model[S->assignments[i]] && !S->false[S->assignments[i]]) {
-      assign (S, lemma, 0);
-      propagate (S); } } }
+void printImpliedDecisions(struct solver *S)
+{
+	printf("v");
+	for (int i = 1; i <= S->nVars; i++)
+	{
+		if (S->model[i] && (S->false[-i] == IMPLIED))
+		{
+			printf(" %i", i);
+		}
+		else if (S->false[i] == IMPLIED)
+		{
+			printf(" %i", -i);
+		}
+	}
+	printf("\n");
+}
 
-void printDecisions (struct solver* S) {
-  printf ("v");
-  for (int i = 1; i <= S->nVars; i++) {
-    if (S->model[i] && (S->false[-i] == IMPLIED)) {
-      printf (" %i", i); }
-      else if (S->false[i] == IMPLIED) {
-      printf (" %i", -i); } }
-  printf ("\n"); }
+int checkStatus(struct solver *S)
+{
+	if (!evaluateAssignment(S))
+		return INVALID;
+	else if (!evaluateBuildability(S))
+		return INCOMPLETE;
+	else
+		return BUILDABLE;
+}
 
 int solve (struct solver* S) {                                      // Determine satisfiability
   int decision = S->head;                                           // Initialize the solver
@@ -223,7 +269,7 @@ int solve (struct solver* S) {                                      // Determine
     if (S->nLemmas > old_nLemmas) {                                 // If the last decision caused a conflict
       decision = S->head;                                           // Reset the decision heuristic to head
       if (S->fast > (S->slow / 100) * 125) {                        // If fast average is substantially larger than slow average
-        S->res = 0; S->fast = (S->slow / 100) * 125; restart (S);   // Restart and update the averages
+        S->nRestarts = 0; S->fast = (S->slow / 100) * 125; restart (S);   // Restart and update the averages
         if (S->nLemmas > S->maxLemmas) reduceDB (S, 6); } }         // Reduce the DB when it contains too many lemmas
 
     while (S->false[decision] || S->false[-decision]) {             // As long as the temporary decision is assigned
@@ -234,103 +280,185 @@ int solve (struct solver* S) {                                      // Determine
     *(S->assigned++) = -decision;                                   // And push it on the assigned stack
     decision = abs(decision); S->reason[decision] = 0; } }          // Decisions have no reason clauses
 
-void initDatabase (struct solver* S) {
-  S->mem_used       = 0;                              // The number of integers allocated in the DB
-  S->DB = (int *) malloc (sizeof (int) * MEM_MAX);    // Allocate the initial database
-  S->DB[S->mem_used++] = 0; }                         // Make sure there is a 0 before the clauses are loaded
+void initDB(struct solver *S)																		// Initialize the database
+{
+	S->DB = (int *)malloc(sizeof(int) * MEM_MAX);													// Allocate memory for the database
+	S->mem_used = 0;																				// The number of integers stored in the DB
+	S->DB[S->mem_used++] = 0;																		// Make sure there is a 0 before the clauses are parsed
+}
 
-void initCDCL (struct solver* S, int n, int m) {
-  if (n < 1)      n = 1;                  // The code assumes that there is at least one variable
-  S->nVars          = n;                  // Set the number of variables
-  S->nClauses       = m;                  // Set the number of clauses
-  S->nLemmas        = 0;                  // The number of learned clauses -- redundant means learned
-  S->nConflicts     = 0;                  // Under of conflicts which is used to updates scores
-  S->maxLemmas      = 2000;               // Initial maximum number of learnt clauses
-  S->res = 0;                             // Initialize restarts
-  S->fast = S->slow = 1 << 24;            // Initialize the fast and slow moving averages
+void initCDCL(struct solver *S, int nVars, int nClauses)											// Initialize the CDCL state
+{
+	if (nVars < 1)																					// The code assumes that there is at least one variable
+		nVars = 1;
 
-  S->model       = getMemory (S, n+1); // Full assignment of the (Boolean) variables (initially set to false)
-  S->next        = getMemory (S, n+1); // Next variable in the heuristic order
-  S->prev        = getMemory (S, n+1); // Previous variable in the heuristic order
-  S->buffer      = getMemory (S, n  ); // A buffer to store a temporary clause
-  S->reason      = getMemory (S, n+1); // Array of clauses
-  S->falseStack  = getMemory (S, n+1); // Stack of falsified literals -- this pointer is never changed
-  S->forced      = S->falseStack;      // Points inside *falseStack at first decision (unforced literal)
-  S->processed   = S->falseStack;      // Points inside *falseStack at first unprocessed literal
-  S->assigned    = S->falseStack;      // Points inside *falseStack at last unprocessed literal
-  S->false       = getMemory (S, 2*n+1); S->false += n; // Labels for variables, non-zero means false
-  S->first       = getMemory (S, 2*n+1); S->first += n; // Offset of the first watched clause
+	S->nVars = nVars;																				// The number of variables
+	S->nClauses = nClauses;																			// The number of clauses
+	S->maxLemmas = 2000;																			// The initial maximum number of learnt clauses
+	S->nLemmas = 0;																					// The number of learnt clauses -- redundant means learnt
+	S->nConflicts = 0;																				// The number of conflicts which is used to updates scores
+	S->nRestarts = 0;																				// The number of restarts
+	S->fast = S->slow = 1 << 24;																	// The fast and slow moving averages
 
-  int i; for (i = 1; i <= n; i++) {                        // Initialize the main data structures:
-    S->prev [i] = i - 1; S->next[i-1] = i;                 // the double-linked list for variable-move-to-front,
-    S->model[i] = S->false[-i] = S->false[i] = 0;          // the model (phase-saving), the false array,
-    S->first[i] = S->first[-i] = END; }                    // and first (watch pointers).
-  S->head = n; }                                           // Initialize the head of the double-linked list
+	S->model = getMemory(S, nVars + 1);																// Complete initial assignment (false) of the variables
+	S->next = getMemory(S, nVars + 1);																// The next variable in the heuristic order
+	S->prev = getMemory(S, nVars + 1);																// The previous variable in the heuristic order
+	S->clauseBuffer = getMemory(S, nVars);		 													// A buffer to store a temporary clause
+	S->reason = getMemory(S, nVars + 1);	 														// An array of clauses
+	S->falseStack = getMemory(S, nVars + 1);														// The stack of falsified literals -- this pointer is never changed
+	S->forced = S->falseStack;																		// Points to first decision (unforced literal) inside *falseStack
+	S->processed = S->falseStack;		 															// Points to first unprocessed literal inside *falseStack
+	S->assigned = S->falseStack;		 															// Points to last unprocessed literal inside *falseStack
 
-int parse (struct solver* S, char* filename) {                            // Parse the formula and initialize
-  int tmp; FILE* input = fopen (filename, "r");                           // Read the CNF file
-  if (input == NULL) printf ("c FILE NOT FOUND\n"), exit (ERROR);         // Exit if file not found
+	S->false = getMemory(S, 2 * nVars + 1);															// The labels for variables, non-zero means false
+	S->false += nVars;
+	S->first = getMemory(S, 2 * nVars + 1);															// The offset of the first watched clause
+	S->first += nVars;
 
-  initDatabase(S);
+	int i;
+	for (i = 1; i <= nVars; i++)																	// Initialize the main data structures:
+	{
+		S->prev[i] = i - 1;
+		S->next[i - 1] = i;							  												// the double-linked list for variable-move-to-front,
+		S->model[i] = S->false[-i] = S->false[i] = 0; 												// the model (phase-saving), the false array,
+		S->first[i] = S->first[-i] = END;															// and first (watch pointers),
+	}
+	S->head = nVars;																				// the head of the double-linked list.
+}
 
-  if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS) {                    // Parse the additional comment lines
-    int i;
+int parse(struct solver *S, char *filename)															// Parse the DIMACS file and initialize the solver struct
+{
+	FILE *input = fopen(filename, "r");																// Open the DIMACS file for reading
+	if (input == NULL)
+		printf("c FILE NOT FOUND\n"), exit(ERROR);													// Exit if file was not found
 
-    do { tmp = fscanf (input, " c d%i", &S->nDeadVars);                   // Parse "dead" (i.e. always false) variables
-      if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }  // Skip rest of line
-    while (tmp != 1 && tmp != EOF);
-    S->deadVars = getMemory (S, S->nDeadVars);
-    i = 0;
-    while (i < S->nDeadVars) {
-      fscanf (input, "%i", &tmp);
-      S->deadVars[i++] = -tmp; }
-    fseek (input, 0, SEEK_SET);                                           // Reset file position
+	initDB(S);																						// Initialize the database
 
-    do { tmp = fscanf (input, " c v%i", &S->nAssignments);                // Parse assigned variables
-      if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }  // Skip rest of line
-    while (tmp != 1 && tmp != EOF);
-    S->assignments = getMemory (S, S->nAssignments);
-    i = 0;
-    while (i < S->nAssignments) {
-      fscanf (input, "%i", &S->assignments[i++]); }
-    fseek (input, 0, SEEK_SET);                                           // Reset file position
-  }
+	int matchedItems;
 
-  do { tmp = fscanf (input, " p cnf %i %i \n", &S->nVars, &S->nClauses);  // Find the first non-comment line
-    if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }    // In case a comment line was found
-  while (tmp != 2 && tmp != EOF);                                         // Skip it and read next line
+	if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS)												// Parse the additional comment lines
+	{
+		int i;
 
-  initCDCL (S, S->nVars, S->nClauses);                     // Allocate the main datastructures
-  int nZeros = S->nClauses, size = 0;                      // Initialize the number of clauses to read
-  while (nZeros > 0) {                                     // While there are clauses in the file
-    int lit = 0; tmp = fscanf (input, " %i ", &lit);       // Read a literal.
-    if (!lit) {                                            // If reaching the end of the clause
-      int* clause = addClause (S, S->buffer, size, 1);     // Then add the clause to data_base
-      if (!size || ((size == 1) && S->false[clause[0]]))   // Check for empty clause or conflicting unit
-        return UNSAT;                                      // If either is found return UNSAT
-      if ((size == 1) && !S->false[-clause[0]]) {          // Check for a new unit
-        assign (S, clause, 1); }                           // Directly assign new units (forced = 1)
-      size = 0; --nZeros; }                                // Reset buffer
-    else S->buffer[size++] = lit; }                        // Add literal to buffer
-  fclose (input);                                          // Close the formula file
-  return SAT; }                                            // Return that no conflict was observed
+		do
+		{
+			matchedItems = fscanf(input, " c d%i", &S->nDeadVars);									// Parse number of dead (i.e. always false) variables
+			if (matchedItems > 0 && matchedItems != EOF)											// Break from loop on match
+				break;
+			matchedItems = fscanf(input, "%*s\n");													// Skip rest of line otherwise
+		}
+		while (matchedItems != 1 && matchedItems != EOF);
 
-int main (int argc, char** argv) {                                                                          // The main procedure
-  if (argc == 1) printf ("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
-  if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                     // Print version if argument --version is given
-  else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
-  else if (!strcmp (argv[1], "--propagate")) MODE = MODE_PROPAGATE, ++argv;                                 // Set mode to propagate an assignment
+		S->deadVars = getMemory(S, S->nDeadVars);													// Allocate memory for the list of dead variables
+		i = 0;
+		while (i < S->nDeadVars)																	// Parse dead variable indices
+		{
+			fscanf(input, "%i", &matchedItems);
+			S->deadVars[i++] = -matchedItems;
+		}
 
-  struct solver S;                                                                        // Create the solver datastructure
-  if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
+		fseek(input, 0, SEEK_SET);																	// Reset file position
 
-  if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS) {
-    int status = checkStatus (&S);
-    if (MODE == MODE_PROPAGATE) evaluateDecisions (&S), printDecisions (&S);
-    if (status == INVALID) printf ("s INVALID\n");
-    else if (status == INCOMPLETE) printf ("s INCOMPLETE\n");
-    else printf ("s BUILDABLE\n");
-    exit (status); }
-  else if (MODE == MODE_SOLVE) {
-    if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
-    else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution
+		do
+		{
+			matchedItems = fscanf(input, " c v%i", &S->nAssignments);								// Parse number of variable assignments
+			if (matchedItems > 0 && matchedItems != EOF)											// Break from loop on match
+				break;
+			matchedItems = fscanf(input, "%*s\n");													// Skip rest of line otherwise
+		}
+		while (matchedItems != 1 && matchedItems != EOF);
+
+		S->assignments = getMemory(S, S->nAssignments);												// Parse variable assignments
+		i = 0;
+		while (i < S->nAssignments)
+		{
+			fscanf(input, "%i", &S->assignments[i++]);
+		}
+
+		fseek(input, 0, SEEK_SET);																	// Reset file position
+	}
+
+	do
+	{
+		matchedItems = fscanf(input, " p cnf %i %i \n", &S->nVars, &S->nClauses);					// Parse the first non-comment line (problem line)
+		if (matchedItems > 0 && matchedItems != EOF)												// Break from loop on match
+			break;
+		matchedItems = fscanf(input, "%*s\n");														// Skip rest of line otherwise
+	}
+	while (matchedItems != 2 && matchedItems != EOF);
+
+	initCDCL(S, S->nVars, S->nClauses);																// Initialize the CDCL state
+
+	int nUnreadClauses = S->nClauses, clauseSize = 0;												// Initialize the number of clauses to read
+	while (nUnreadClauses > 0)																		// While there are clauses in the file
+	{
+		int literal = 0;
+		matchedItems = fscanf(input, " %i ", &literal);												// Parse a literal
+		if (!literal)																				// If reached the end of the clause (denoted by a "0")
+		{
+			int *clause = addClause(S, S->clauseBuffer, clauseSize, 1);								// Add the clause to database
+
+			if (!clauseSize || ((clauseSize == 1) && S->false[clause[0]]))							// Check for empty clause or conflicting unit
+				return UNSAT;																		// If either is found return UNSAT
+
+			if ((clauseSize == 1) && !S->false[-clause[0]])											// Check for a new unit
+			{
+				assign(S, clause, 1);																// Directly assign new units (forced = 1)
+			}
+
+			clauseSize = 0;																			// Reset buffer
+
+			--nUnreadClauses;
+		}
+		else
+			S->clauseBuffer[clauseSize++] = literal;												// Add literal to buffer
+	}
+
+	fclose(input);																					// Close the DIMACS file
+
+	return SAT;																						// Return that no conflict was observed
+}
+
+int main(int argc, char **argv)																		// The main procedure
+{
+	if (argc == 1)
+		printf("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit(OK);		// Print usage and exit if no argument is given
+
+	if (!strcmp(argv[1], "--version"))
+		printf(VERSION "\n"), exit(OK);																// Print version and exit if argument --version is given
+	else if (!strcmp(argv[1], "--status"))
+		MODE = MODE_STATUS;																			// Set mode to check status of an assignment if argument --status is given
+	else if (!strcmp(argv[1], "--propagate"))
+		MODE = MODE_PROPAGATE;																		// Set mode to propagate an assignment if argument --propagate is given
+	else
+		MODE = MODE_SOLVE;																			// Default mode: SAT solving
+
+	struct solver S;																				// Create the solver struct
+	if (parse(&S, argv[argc-1]) == UNSAT)															// Parse the DIMACS file
+		printf("s UNSATISFIABLE\n"), exit(UNSAT);													// Exit if the parsed problem contains a conflict even before solving
+
+	int status;
+	if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS)
+	{
+		if (MODE == MODE_PROPAGATE)																	// Print implied variable decisions due to propagation
+			propagateAssignment(&S), printImpliedDecisions(&S);
+
+		status = checkStatus(&S);																	// Check and print problem status
+		if (status == INVALID)
+			printf("s INVALID\n");
+		else if (status == INCOMPLETE)
+			printf("s INCOMPLETE\n");
+		else
+			printf("s BUILDABLE\n");
+	}
+	else
+	{
+		status = solve(&S);																			// Solve without limit (number of conflicts)
+		if (status == UNSAT)																		// and print whether the formula has a solution
+			printf("s UNSATISFIABLE\n");
+		else
+			printf("s SATISFIABLE\n");
+	}
+
+	exit(status);																					// Exit with problem status code
+}
