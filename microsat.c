@@ -57,8 +57,8 @@ int *getMemory(struct solver *S, int mem_size)														// Allocate memory o
 
 int *addClause(struct solver *S, int *in, int size, int irr)										// Adds a clause stored in *in of size size
 {
-	int i, used = S->mem_used;				  														// Store a pointer to the beginning of the clause
-	int *clause = getMemory(S, size + 3) + 2; 														// Allocate memory for the clause in the database
+	int i, used = S->mem_used;																		// Store a pointer to the beginning of the clause
+	int *clause = getMemory(S, size + 3) + 2;														// Allocate memory for the clause in the database
 
 	{
 		addWatch(S, in[0], used);																	// Two watch pointers to the datastructure
@@ -136,7 +136,7 @@ int implied(struct solver *S, int lit)																// Check if lit(eral) is i
 	if (!S->reason[abs(lit)])																		// In case lit is a decision, it is not implied
 		return 0;
 
-	int *p = (S->DB + S->reason[abs(lit)] - 1); 													// Get the reason of lit(eral)
+	int *p = (S->DB + S->reason[abs(lit)] - 1);														// Get the reason of lit(eral)
 	while (*(++p))																					// While there are literals in the reason
 	{
 		if ((S->false[*p] ^ MARK) && !implied(S, *p))												// Recursively check if non-MARK literals are implied
@@ -510,12 +510,12 @@ void initCDCL(struct solver *S, int nVars, int nClauses)											// Initialize
 	S->model = getMemory(S, nVars + 1);																// Complete initial assignment (false) of the variables
 	S->next = getMemory(S, nVars + 1);																// The next variable in the heuristic order
 	S->prev = getMemory(S, nVars + 1);																// The previous variable in the heuristic order
-	S->clauseBuffer = getMemory(S, nVars);		 													// A buffer to store a temporary clause
-	S->reason = getMemory(S, nVars + 1);	 														// An array of clauses
+	S->clauseBuffer = getMemory(S, nVars);															// A buffer to store a temporary clause
+	S->reason = getMemory(S, nVars + 1);															// An array of clauses
 	S->falseStack = getMemory(S, nVars + 1);														// The stack of falsified literals -- this pointer is never changed
 	S->forced = S->falseStack;																		// Points to first decision (unforced literal) inside *falseStack
-	S->processed = S->falseStack;		 															// Points to first unprocessed literal inside *falseStack
-	S->assigned = S->falseStack;		 															// Points to last unprocessed literal inside *falseStack
+	S->processed = S->falseStack;																	// Points to first unprocessed literal inside *falseStack
+	S->assigned = S->falseStack;																	// Points to last unprocessed literal inside *falseStack
 
 	S->false = getMemory(S, 2 * nVars + 1);															// The labels for variables, non-zero means false
 	S->false += nVars;
@@ -526,8 +526,8 @@ void initCDCL(struct solver *S, int nVars, int nClauses)											// Initialize
 	for (i = 1; i <= nVars; i++)																	// Initialize the main data structures:
 	{
 		S->prev[i] = i - 1;
-		S->next[i - 1] = i;							  												// the double-linked list for variable-move-to-front,
-		S->model[i] = S->false[-i] = S->false[i] = 0; 												// the model (phase-saving), the false array,
+		S->next[i - 1] = i;																			// the double-linked list for variable-move-to-front,
+		S->model[i] = S->false[-i] = S->false[i] = 0;												// the model (phase-saving), the false array,
 		S->first[i] = S->first[-i] = END;															// and first (watch pointers),
 	}
 	S->head = nVars;																				// the head of the double-linked list.
