@@ -324,57 +324,70 @@ build:;																								// Build conflict clause; Empty the clause buffer
 	return addClause(S, S->clauseBuffer, size, 0);													// Add new conflict clause to redundant DB
 }
 
-int propagate(struct solver *S)
-{												// Performs unit propagation
-	int forced = S->reason[abs(*S->processed)]; // Initialize forced flag
-	while (S->processed < S->assigned)
-	{								 // While unprocessed false literals
-		int lit = *(S->processed++); // Get first unprocessed literal
-		int *watch = &S->first[lit]; // Obtain the first watch pointer
-		while (*watch != END)
-		{										// While there are watched clauses (watched by lit)
-			int i, unit = 1;					// Let's assume that the clause is unit
-			int *clause = (S->DB + *watch + 1); // Get the clause from DB
+int propagate(struct solver *S)																		// Performs unit propagation
+{
+	int forced = S->reason[abs(*S->processed)];														// Initialize forced flag
+	while (S->processed < S->assigned)																// While unprocessed false literals
+	{
+		int lit = *(S->processed++);																// Get first unprocessed literal
+		int *watch = &S->first[lit];																// Obtain the first watch pointer
+
+		while (*watch != END)																		// While there are watched clauses (watched by lit)
+		{
+			int i, unit = 1;																		// Let's assume that the clause is unit
+			int *clause = (S->DB + *watch + 1);														// Get the clause from DB
+
 			if (clause[-2] == 0)
-				clause++; // Set the pointer to the first literal in the clause
+				clause++;																			// Set the pointer to the first literal in the clause
+
 			if (clause[0] == lit)
-				clause[0] = clause[1];			// Ensure that the other watched literal is in front
-			for (i = 2; unit && clause[i]; i++) // Scan the non-watched literals
-				if (!S->false[clause[i]])
-				{ // When clause[i] is not false, it is either true or unset
-					clause[1] = clause[i];
-					clause[i] = lit; // Swap literals
-					int store = *watch;
-					unit = 0;				// Store the old watch
-					*watch = S->DB[*watch]; // Remove the watch from the list of lit
-					addWatch(S, clause[1], store);
-				} // Add the watch to the list of clause[1]
-			if (unit)
-			{ // If the clause is indeed unit
-				clause[1] = lit;
-				watch = (S->DB + *watch); // Place lit at clause[1] and update next watch
-				if (S->false[-clause[0]])
-					continue; // If the other watched literal is satisfied continue
-				if (!S->false[clause[0]])
-				{ // If the other watched literal is falsified,
-					assign(S, clause, forced);
-				} // A unit clause is found, and the reason is set
+				clause[0] = clause[1];																// Ensure that the other watched literal is in front
+
+			for (i = 2; unit && clause[i]; i++)														// Scan the non-watched literals
+				if (!S->false[clause[i]])															// When clause[i] is not false, it is either true or unset
+				{
+					clause[1] = clause[i];															// Swap literals
+					clause[i] = lit;
+
+					int store = *watch;																// Store the old watch
+					unit = 0;
+					*watch = S->DB[*watch];															// Remove the watch from the list of lit
+					addWatch(S, clause[1], store);													// Add the watch to the list of clause[1]
+				}
+
+			if (unit)																				// If the clause is indeed unit
+			{
+				clause[1] = lit;																	// Place lit at clause[1] and update next watch
+				watch = (S->DB + *watch);
+
+				if (S->false[-clause[0]])															// If the other watched literal is satisfied continue
+					continue;
+
+				if (!S->false[clause[0]])															// If the other watched literal is falsified,
+				{
+					assign(S, clause, forced);														// A unit clause is found, and the reason is set
+				}
 				else
 				{
-					if (forced)
-						return UNSAT;				 // Found a root level conflict -> UNSAT
-					int *lemma = analyze(S, clause); // Analyze the conflict return a conflict clause
-					if (!lemma[1])
-						forced = 1; // In case a unit clause is found, set forced flag
-					assign(S, lemma, forced);
+					if (forced)																		// Found a root level conflict -> UNSAT
+						return UNSAT;
+
+					int *lemma = analyze(S, clause);												// Analyze the conflict return a conflict clause
+					if (!lemma[1])																	// In case a unit clause is found, set forced flag
+						forced = 1;
+
+					assign(S, lemma, forced);														// Assign the conflict clause as a unit
 					break;
 				}
 			}
 		}
-	} // Assign the conflict clause as a unit
-	if (forced)
-		S->forced = S->processed;						// Set S->forced if applicable
-	return SAT; }	                                    // Finally, no conflict was found
+	}
+
+	if (forced)																						// Set S->forced if applicable
+		S->forced = S->processed;
+
+	return SAT;																						// Finally, no conflict was found
+}
 
 void reduceDB(struct solver *S, int k)																// Removes "less useful" lemmas from DB
 {
