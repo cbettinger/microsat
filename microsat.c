@@ -316,6 +316,9 @@ int parse (struct solver* S, char* filename) {                            // Par
   return SAT; }                                            // Return that no conflict was observed
 
 int main (int argc, char** argv) {                                                                          // The main procedure
+  printf("%i %i %i %i\n", sizeof (int), sizeof (int *), MEM_MAX, (sizeof (int) * MEM_MAX) );
+  printf("%i %i %i\n\n", (sizeof (int) * 1 << 30), (sizeof (int) * 1 << 29), (sizeof (int) * 1 << 28));
+
   if (argc == 1) printf ("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
   if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                     // Print version if argument --version is given
   else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
