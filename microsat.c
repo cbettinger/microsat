@@ -6,7 +6,7 @@ enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOM
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
 enum MODES { MODE_SOLVE = 0, MODE_PROPAGATE = 1, MODE_STATUS = 2 };
 
-const int MEM_MAX = 1 << 30;
+const int MEM_MAX = 1 << 28;
 int MODE = MODE_SOLVE;
 
 struct solver { // The variables in the struct are described in the allocate procedure
