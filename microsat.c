@@ -196,7 +196,7 @@ void evaluateDecisions (struct solver* S) {
 
   for (int i = S->nAssignments-1; i >= 0; i--) {
     int* lemma = &S->assignments[i];
-    if (!S->model[S->assignments[i]] && !S->false[S->assignments[i]]) {
+    if ((S->assignments[i] > 0 && !S->model[S->assignments[i]]) || (S->assignments[i] < 0 && !S->false[S->assignments[i]])) {
       assign (S, lemma, 0);
       propagate (S); } } }
 
