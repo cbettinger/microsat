@@ -316,36 +316,20 @@ int main (int argc, char** argv) {                                              
   else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
   else if (!strcmp (argv[1], "--propagate")) MODE = MODE_PROPAGATE, ++argv;                                 // Set mode to propagate an assignment
 
-  int status = INCOMPLETE;
   struct solver S;                                                                        // Create the solver datastructure
   if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
 
   if (MODE == MODE_PROPAGATE) {
     evaluateDecisions (&S);
     printDecisions (&S);
-    if (evaluateBuildability(&S)) {
-      status = BUILDABLE;
-      printf ("s BUILDABLE\n");
-      exit (status);
-    }
-    printf ("s INCOMPLETE\n");
-    exit (status); }
+    if (evaluateBuildability(&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
+    else printf ("s INCOMPLETE\n"), exit (INCOMPLETE); }
   else if (MODE == MODE_STATUS) {
     if (evaluateAssignment (&S)) {
-      if (evaluateBuildability (&S)) {
-        status = BUILDABLE;
-        printf ("s BUILDABLE\n");
-        exit (status);
-      }
-      printf ("s INCOMPLETE\n");
-      exit (status);
+      if (evaluateBuildability (&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
+      else printf ("s INCOMPLETE\n"), exit (INCOMPLETE);
     }
-    else { 
-      status = INVALID;
-      printf ("s INVALID\n");
-      exit (status);
-    }
-  }
+    else printf ("s INVALID\n"), exit (INVALID); }
   else if (MODE == MODE_SOLVE) {
     if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
     else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution
