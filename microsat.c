@@ -189,11 +189,6 @@ int evaluateBuildability (struct solver* S) {
             return 0; } } } }
   return 1; }
 
-int checkStatus (struct solver* S) {
-  if (!evaluateAssignment (S)) return INVALID;
-  else if (!evaluateBuildability (S)) return INCOMPLETE;
-  else return BUILDABLE; }
-
 void evaluateDecisions (struct solver* S) {
   for (int i = 0; i < S->nDeadVars; i++) {
     assign (S, &S->deadVars[i], 1); }
@@ -315,22 +310,42 @@ int parse (struct solver* S, char* filename) {                            // Par
   fclose (input);                                          // Close the formula file
   return SAT; }                                            // Return that no conflict was observed
 
-int main (int argc, char** argv) {                                                                          // The main procedure
+int main (int argc, char** argv) {                                                                // The main procedure
   if (argc == 1) printf ("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
   if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                     // Print version if argument --version is given
   else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
   else if (!strcmp (argv[1], "--propagate")) MODE = MODE_PROPAGATE, ++argv;                                 // Set mode to propagate an assignment
 
+  int status = INCOMPLETE;
   struct solver S;                                                                        // Create the solver datastructure
   if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
 
-  if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS) {
-    int status = checkStatus (&S);
-    if (MODE == MODE_PROPAGATE) evaluateDecisions (&S), printDecisions (&S);
-    if (status == INVALID) printf ("s INVALID\n");
-    else if (status == INCOMPLETE) printf ("s INCOMPLETE\n");
-    else printf ("s BUILDABLE\n");
+  if (MODE == MODE_PROPAGATE) {
+    evaluateDecisions (&S);
+    printDecisions (&S);
+    if (evaluateBuildability(&S)) {
+      status = BUILDABLE;
+      printf ("s BUILDABLE\n");
+      exit (status);
+    }
+    printf ("s INCOMPLETE\n");
     exit (status); }
+  else if (MODE == MODE_STATUS) {
+    if (evaluateAssignment (&S)) {
+      if (evaluateBuildability (&S)) {
+        status = BUILDABLE;
+        printf ("s BUILDABLE\n");
+        exit (status);
+      }
+      printf ("s INCOMPLETE\n");
+      exit (status);
+    }
+    else { 
+      status = INVALID;
+      printf ("s INVALID\n");
+      exit (status);
+    }
+  }
   else if (MODE == MODE_SOLVE) {
     if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
     else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution
