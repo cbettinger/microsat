@@ -1,5 +1,5 @@
 # microsat
-[microsat](https://github.com/marijnheule/microsat) is a simple CDCL SAT solver by Marijn Heule and Armin Biere.
+[microsat](https://github.com/marijnheule/microsat) is a simple CDCL SAT solver, originally created by Marijn Heule and Armin Biere.
 
 This fork adds the following features:
 * Deduce variable decisions by propagating a (partial) assignment of the SAT problem variables
