@@ -135,8 +135,8 @@ int propagate (struct solver* S) {                  // Performs unit propagation
           int* lemma = analyze (S, clause);         // Analyze the conflict return a conflict clause
           if (!lemma[1]) forced = 1;                // In case a unit clause is found, set forced flag
           assign (S, lemma, forced); break; } } } } // Assign the conflict clause as a unit
-  if (forced) S->forced = S->processed;	            // Set S->forced if applicable
-  return SAT; }	                                    // Finally, no conflict was found
+  if (forced) S->forced = S->processed;             // Set S->forced if applicable
+  return SAT; }                                     // Finally, no conflict was found
 
 int allVariablesAssigned (struct solver* S) {
   int nVarsAssigned = 0;
