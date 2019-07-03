@@ -310,7 +310,7 @@ int parse (struct solver* S, char* filename) {                            // Par
   fclose (input);                                          // Close the formula file
   return SAT; }                                            // Return that no conflict was observed
 
-int main (int argc, char** argv) {                                                                // The main procedure
+int main (int argc, char** argv) {                                                                          // The main procedure
   if (argc == 1) printf ("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
   if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                     // Print version if argument --version is given
   else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
