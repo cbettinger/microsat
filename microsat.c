@@ -146,30 +146,31 @@ int allVariablesAssigned (struct solver* S) {
 
 int evaluateClauses (struct solver* S) {
   int clauseStatus = 1;
-  int lit = *(S->processed++);
-  int* watch = &S->first[lit];
-  while (*watch != END) {
-    int i, unit = 1;
-    int *clause = (S->DB + *watch + 1);
-    if (clause[-2] == 0) clause++;
-    if (clause[0] == lit) clause[0] = clause[1];
-    for (i = 2; unit && clause[i]; i++)
-      if (!S->false[clause[i]]) {
-        clause[1] = clause[i]; clause[i] = lit;
-        int store = *watch; unit = 0;
-        *watch = S->DB[*watch];
-        addWatch (S, clause[1], store); }
-    if (unit) {
-      clause[1] = lit; watch = (S->DB + *watch);
-      if (S->false[-clause[0]] || !S->false[clause[0]]) continue;
-      else {
-        clauseStatus = 0;
-        return clauseStatus; } } }
+  while (S->processed < S->assigned) {
+    int lit = *(S->processed++);
+    int* watch = &S->first[lit];
+    while (*watch != END) {
+      int i, unit = 1;
+      int *clause = (S->DB + *watch + 1);
+      if (clause[-2] == 0) clause++;
+      if (clause[0] == lit) clause[0] = clause[1];
+      for (i = 2; unit && clause[i]; i++)
+        if (!S->false[clause[i]]) {
+          clause[1] = clause[i]; clause[i] = lit;
+          int store = *watch; unit = 0;
+          *watch = S->DB[*watch];
+          addWatch (S, clause[1], store); }
+      if (unit) {
+        clause[1] = lit; watch = (S->DB + *watch);
+        if (S->false[-clause[0]] || !S->false[ clause[0]]) continue;
+        else {
+          clauseStatus = 0;
+          return clauseStatus; } } } }
   return clauseStatus; }
 
 int evaluateAssignment (struct solver* S) {
   for (int i = 0; i < S->nAssignments; i++) {
-    if ((S->assignments[i] < 0 && S->false[S->assignments[i]]) || (S->assignments[i] > 0 && S->false[S->assignments[i]])) {
+    if (S->false[S->assignments[i]]) {
       return 0; }
     for (int j = 0; j < S->nDeadVars; j++) {
       if (S->deadVars[j] == -S->assignments[i]) {
