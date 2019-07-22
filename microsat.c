@@ -320,9 +320,11 @@ int main (int argc, char** argv) {                                              
   struct solver S;                                                                        // Create the solver datastructure
   if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
 
+  if (MODE == MODE_SOLVE) {
+    if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
+    else printf("s SATISFIABLE\n"), exit (SAT); }                                         // and print whether the formula has a solution
   if (MODE == MODE_PROPAGATE) {
-    evaluateDecisions (&S);
-    printDecisions (&S);
+    evaluateDecisions (&S), printDecisions (&S);
     if (evaluateBuildability(&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
     else printf ("s INCOMPLETE\n"), exit (INCOMPLETE); }
   else if (MODE == MODE_STATUS) {
@@ -330,7 +332,4 @@ int main (int argc, char** argv) {                                              
       if (evaluateBuildability (&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
       else printf ("s INCOMPLETE\n"), exit (INCOMPLETE);
     }
-    else printf ("s INVALID\n"), exit (INVALID); }
-  else if (MODE == MODE_SOLVE) {
-    if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
-    else printf("s SATISFIABLE\n"), exit (SAT); } }                                       // and print whether the formula has a solution
+    else printf ("s INVALID\n"), exit (INVALID); } }
