@@ -323,7 +323,7 @@ int main (int argc, char** argv) {                                              
   if (MODE == MODE_SOLVE) {
     if (solve (&S) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);                   // Solve without limit (number of conflicts)
     else printf("s SATISFIABLE\n"), exit (SAT); }                                         // and print whether the formula has a solution
-  if (MODE == MODE_PROPAGATE) {
+  else if (MODE == MODE_PROPAGATE) {
     evaluateDecisions (&S), printDecisions (&S);
     if (evaluateBuildability(&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
     else printf ("s INCOMPLETE\n"), exit (INCOMPLETE); }
