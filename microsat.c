@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40, INVALID = 50 };
+enum EXIT_CODES { OK = 0, ERROR = 1, SAT = 10, UNSAT = 20, BUILDABLE = 30, INCOMPLETE = 40 };
 enum LITERAL_MARKS { END = -9, MARK = 2, IMPLIED = 6 };
-enum MODES { MODE_SOLVE = 0, MODE_PROPAGATE = 1, MODE_STATUS = 2 };
+enum MODES { MODE_SOLVE = 0, MODE_PROPAGATE = 1 };
 
 const int MEM_MAX = 1 << 28;
 int MODE = MODE_SOLVE;
@@ -269,7 +269,7 @@ int parse (struct solver* S, char* filename) {                            // Par
 
   initDatabase(S);
 
-  if (MODE == MODE_PROPAGATE || MODE == MODE_STATUS) {                    // Parse the additional comment lines
+  if (MODE == MODE_PROPAGATE) {                                           // Parse the additional comment lines
     int i;
 
     do { tmp = fscanf (input, " c d%i", &S->nDeadVars);                   // Parse "dead" (i.e. always false) variables
@@ -312,10 +312,9 @@ int parse (struct solver* S, char* filename) {                            // Par
   return SAT; }                                            // Return that no conflict was observed
 
 int main (int argc, char** argv) {                                                                          // The main procedure
-  if (argc == 1) printf ("Usage: microsat [--version] [--status | --propagate] DIMACS_FILE\n"), exit (OK);  // Print usage if no argument is given
+  if (argc == 1) printf ("Usage: microsat [--version] [--propagate] DIMACS_FILE\n"), exit (OK);             // Print usage if no argument is given
   if (!strcmp (argv[1], "--version")) printf (VERSION "\n"), exit (OK);                                     // Print version if argument --version is given
   else if (!strcmp (argv[1], "--propagate")) MODE = MODE_PROPAGATE, ++argv;                                 // Set mode to propagate an assignment
-  else if (!strcmp (argv[1], "--status")) MODE = MODE_STATUS, ++argv;                                       // Set mode to check status of an assignment
 
   struct solver S;                                                                        // Create the solver datastructure
   if (parse (&S, argv[1]) == UNSAT) printf("s UNSATISFIABLE\n"), exit (UNSAT);            // Parse the DIMACS file
@@ -326,10 +325,4 @@ int main (int argc, char** argv) {                                              
   else if (MODE == MODE_PROPAGATE) {
     evaluateDecisions (&S), printDecisions (&S);
     if (evaluateBuildability(&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
-    else printf ("s INCOMPLETE\n"), exit (INCOMPLETE); }
-  else if (MODE == MODE_STATUS) {
-    if (evaluateAssignment (&S)) {
-      if (evaluateBuildability (&S)) printf ("s BUILDABLE\n"), exit (BUILDABLE);
-      else printf ("s INCOMPLETE\n"), exit (INCOMPLETE);
-    }
-    else printf ("s INVALID\n"), exit (INVALID); } }
+    else printf ("s INCOMPLETE\n"), exit (INCOMPLETE); } }
