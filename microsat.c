@@ -10,9 +10,8 @@ const int MEM_MAX = 1 << 28;
 int MODE = MODE_SOLVE;
 
 struct solver { // The variables in the struct are described in the allocate procedure
-  int  *DB, nVars, nClauses, mem_used, mem_fixed, maxLemmas, nLemmas, *buffer, nConflicts, *model,
-       *reason, *falseStack, *false, *first, *forced, *processed, *assigned, *next, *prev, head, res, fast, slow,
-       nDeadVars, *deadVars, nAssignments, *assignments; };
+  int  *DB, nVars, nClauses, mem_used, mem_fixed, maxLemmas, nLemmas, *buffer, nConflicts, *model, *reason, *falseStack,
+       *false, *first, *forced, *processed, *assigned, *next, *prev, head, res, fast, slow, nAssignments, *assignments; };
 
 void unassign (struct solver* S, int lit) { S->false[lit] = 0; }   // Unassign the literal
 
@@ -172,9 +171,6 @@ int evaluateAssignment (struct solver* S) {
   for (int i = 0; i < S->nAssignments; i++) {
     if (S->false[S->assignments[i]]) {
       return 0; }
-    for (int j = 0; j < S->nDeadVars; j++) {
-      if (S->deadVars[j] == -S->assignments[i]) {
-        return 0; } }
     assign (S, &S->assignments[i], 1);
     if (!evaluateClauses (S)) {
       return 0; } }
@@ -191,8 +187,6 @@ int evaluateBuildability (struct solver* S) {
   return 1; }
 
 void evaluateDecisions (struct solver* S) {
-  for (int i = 0; i < S->nDeadVars; i++) {
-    assign (S, &S->deadVars[i], 1); }
   propagate (S);
 
   for (int i = S->nAssignments-1; i >= 0; i--) {
@@ -271,17 +265,6 @@ int parse (struct solver* S, char* filename) {                            // Par
 
   if (MODE == MODE_PROPAGATE) {                                           // Parse the additional comment lines
     int i;
-
-    do { tmp = fscanf (input, " c d%i", &S->nDeadVars);                   // Parse "dead" (i.e. always false) variables
-      if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }  // Skip rest of line
-    while (tmp != 1 && tmp != EOF);
-    S->deadVars = getMemory (S, S->nDeadVars);
-    i = 0;
-    while (i < S->nDeadVars) {
-      fscanf (input, "%i", &tmp);
-      S->deadVars[i++] = -tmp; }
-    fseek (input, 0, SEEK_SET);                                           // Reset file position
-
     do { tmp = fscanf (input, " c v%i", &S->nAssignments);                // Parse assigned variables
       if (tmp > 0 && tmp != EOF) break; tmp = fscanf (input, "%*s\n"); }  // Skip rest of line
     while (tmp != 1 && tmp != EOF);
