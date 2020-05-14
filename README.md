@@ -30,15 +30,10 @@ This fork adds the following features:
 The (partial) assignment is denoted as a DIMACS comment line which has to be added somewhere before the problem line:
 
 	c v<NUMBER_OF_ASSIGNED_VARIABLES> <ASSIGNED_VARIABLES>
-
-In order to work the solver needs to know the "dead" variables, i.e. variables that are always *false*. This could be determined internally but would increase runtime radically (especially if executed multiple times with the same SAT problem). Therefore they are presumed:
-	
-	c d<NUMBER_OF_DEAD_VARIABLES> <DEAD_VARIABLES>
 	
 For example:
 
 	c v4 5 -7 18 -20
-	c d1 26
 	p cnf ...
 
 Two demo files (one for each status described above) can be found in the *test* subdirectory.
